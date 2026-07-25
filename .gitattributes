@@ -1,0 +1,17 @@
+# Store everything with LF in the repository.
+* text=auto eol=lf
+
+# Shell scripts MUST stay LF. With CRLF, macOS and Linux bash fails on every
+# line with "$'\r': command not found" - which is what would happen to
+# build_app.sh when cloned on a Mac or checked out by a CI runner.
+*.sh text eol=lf
+
+# Windows batch files are the opposite case: cmd.exe wants CRLF.
+*.bat text eol=crlf
+
+# Never touch binaries.
+*.png binary
+*.ico binary
+*.icns binary
+*.zip binary
+*.exe binary

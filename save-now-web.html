@@ -1,0 +1,564 @@
+<title>Save Now!</title>
+
+<style>
+  :root {
+    --ground: #eef1f6;
+    --surface: #ffffff;
+    --surface-2: #f4f6fa;
+    --line: #dde3ed;
+    --text: #18202e;
+    --muted: #5d6b82;
+    --accent: #2f6fe4;
+    --accent-soft: rgba(47, 111, 228, 0.10);
+    --urgent: #b9761a;
+    --shadow: 0 1px 2px rgba(24, 32, 46, .06), 0 12px 32px rgba(24, 32, 46, .10);
+
+    --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+               "Helvetica Neue", Arial, sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+                 "Liberation Mono", monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground: #14181f;
+      --surface: #1b212c;
+      --surface-2: #232b39;
+      --line: #2f3849;
+      --text: #e6eaf2;
+      --muted: #8b97ad;
+      --accent: #5b93f5;
+      --accent-soft: rgba(91, 147, 245, 0.14);
+      --urgent: #f0a63c;
+      --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 16px 40px rgba(0, 0, 0, .45);
+    }
+  }
+
+  /* The viewer's theme toggle must win over the OS preference, both ways. */
+  :root[data-theme="dark"] {
+    --ground: #14181f;
+    --surface: #1b212c;
+    --surface-2: #232b39;
+    --line: #2f3849;
+    --text: #e6eaf2;
+    --muted: #8b97ad;
+    --accent: #5b93f5;
+    --accent-soft: rgba(91, 147, 245, 0.14);
+    --urgent: #f0a63c;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 16px 40px rgba(0, 0, 0, .45);
+  }
+
+  :root[data-theme="light"] {
+    --ground: #eef1f6;
+    --surface: #ffffff;
+    --surface-2: #f4f6fa;
+    --line: #dde3ed;
+    --text: #18202e;
+    --muted: #5d6b82;
+    --accent: #2f6fe4;
+    --accent-soft: rgba(47, 111, 228, 0.10);
+    --urgent: #b9761a;
+    --shadow: 0 1px 2px rgba(24, 32, 46, .06), 0 12px 32px rgba(24, 32, 46, .10);
+  }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: grid;
+    place-items: center;
+    padding: 24px;
+    background: var(--ground);
+    color: var(--text);
+    font-family: var(--font-ui);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .card {
+    width: 100%;
+    max-width: 420px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    box-shadow: var(--shadow);
+    padding: 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+  }
+
+  .masthead { display: flex; flex-direction: column; gap: 4px; }
+  .masthead h1 { margin: 0; font-size: 1.15rem; font-weight: 650; letter-spacing: -0.01em; }
+  .masthead p  { margin: 0; font-size: 0.8rem; color: var(--muted); }
+
+  /* --- countdown ------------------------------------------------------- */
+  .readout {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 18px 0 4px;
+  }
+
+  .clock {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-size: clamp(3rem, 17vw, 4.1rem);
+    line-height: 1;
+    font-weight: 550;
+    letter-spacing: -0.03em;
+    color: var(--accent);
+    transition: color .3s ease;
+  }
+  .clock.is-urgent { color: var(--urgent); }
+  .clock.is-paused { color: var(--muted); }
+
+  .state {
+    font-size: 0.75rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+  }
+  .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--accent);
+  }
+  .state.is-paused .dot { background: var(--muted); }
+
+  /* --- controls -------------------------------------------------------- */
+  .row { display: flex; gap: 8px; }
+  .row > * { flex: 1; }
+
+  button {
+    font: inherit;
+    font-size: 0.85rem;
+    color: var(--text);
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    padding: 9px 12px;
+    cursor: pointer;
+    transition: background .15s ease, border-color .15s ease;
+  }
+  button:hover { background: var(--accent-soft); border-color: var(--accent); }
+  button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  button.primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+    font-weight: 550;
+  }
+  button.primary:hover { filter: brightness(1.08); }
+
+  /* --- interval -------------------------------------------------------- */
+  fieldset { border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+  legend { padding: 0; font-size: 0.8rem; color: var(--muted); }
+
+  .interval { display: flex; align-items: center; gap: 10px; }
+  .interval input {
+    font: inherit;
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    width: 5.5ch;
+    text-align: center;
+    padding: 8px;
+    color: var(--text);
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+  }
+  .interval input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .interval span { font-size: 0.85rem; color: var(--muted); }
+
+  .presets { display: flex; gap: 6px; }
+  .presets button { padding: 6px 0; font-size: 0.78rem; }
+  .presets button[aria-pressed="true"] {
+    background: var(--accent-soft);
+    border-color: var(--accent);
+    color: var(--accent);
+    font-weight: 600;
+  }
+
+  /* --- options --------------------------------------------------------- */
+  .options { display: flex; flex-direction: column; gap: 9px; border-top: 1px solid var(--line); padding-top: 18px; }
+  .opt { display: flex; align-items: center; gap: 9px; font-size: 0.82rem; color: var(--muted); cursor: pointer; }
+  .opt input { accent-color: var(--accent); width: 15px; height: 15px; cursor: pointer; }
+  .opt input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .note { font-size: 0.74rem; color: var(--muted); line-height: 1.5; margin: 0; }
+
+  /* --- reminder overlay ------------------------------------------------ */
+  .overlay {
+    position: fixed;
+    inset: 0;
+    display: none;
+    place-items: center;
+    padding: 24px;
+    background: color-mix(in srgb, var(--ground) 86%, transparent);
+    backdrop-filter: blur(7px);
+    z-index: 10;
+  }
+  .overlay.is-open { display: grid; }
+
+  .alert {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    box-shadow: var(--shadow);
+    padding: 40px 36px 32px;
+    text-align: center;
+    max-width: 380px;
+    width: 100%;
+    animation: rise .22s cubic-bezier(.2, .8, .3, 1);
+  }
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(8px) scale(.98); }
+    to   { opacity: 1; transform: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .alert { animation: none; }
+    .clock { transition: none; }
+  }
+
+  .alert h2 {
+    margin: 0 0 8px;
+    font-size: clamp(2rem, 9vw, 2.6rem);
+    letter-spacing: -0.03em;
+    font-weight: 680;
+    text-wrap: balance;
+  }
+  .alert p { margin: 0 0 26px; color: var(--muted); font-size: 0.9rem; }
+  .alert .row { gap: 10px; }
+  .alert button { padding: 11px 14px; font-size: 0.88rem; }
+
+  .elapsed { font-family: var(--font-mono); font-size: 0.74rem; color: var(--muted); margin-top: 18px; }
+</style>
+
+<main class="card">
+  <header class="masthead">
+    <h1>Save Now!</h1>
+    <p>Reminds you to save your work on a schedule.</p>
+  </header>
+
+  <div class="readout">
+    <div class="clock" id="clock" role="timer" aria-live="off">15:00</div>
+    <div class="state" id="state"><span class="dot"></span><span id="stateText">until the next reminder</span></div>
+  </div>
+
+  <div class="row">
+    <button class="primary" id="pause">Pause</button>
+    <button id="reset">Reset timer</button>
+    <button id="test">Test</button>
+  </div>
+
+  <fieldset>
+    <legend>Remind me every</legend>
+    <div class="interval">
+      <input id="interval" type="number" min="1" max="480" step="1" value="15"
+             inputmode="numeric" aria-label="Minutes between reminders">
+      <span>minutes</span>
+    </div>
+    <div class="presets" id="presets"></div>
+  </fieldset>
+
+  <div class="options">
+    <label class="opt"><input type="checkbox" id="sound" checked> Play a sound</label>
+    <label class="opt"><input type="checkbox" id="notify"> Also show a desktop notification</label>
+    <p class="note" id="note">
+      Keep this tab open. Desktop notifications let the reminder reach you while
+      you're working in another window.
+    </p>
+  </div>
+</main>
+
+<div class="overlay" id="overlay" role="dialog" aria-modal="true" aria-labelledby="alertTitle">
+  <div class="alert">
+    <h2 id="alertTitle">Save Now!</h2>
+    <p>Take a second and save your work.</p>
+    <div class="row">
+      <button class="primary" id="dismiss">Saved it</button>
+      <button id="snooze">Snooze 5 min</button>
+    </div>
+    <div class="elapsed" id="elapsed"></div>
+  </div>
+</div>
+
+<script>
+  // ---- PURE LOGIC START ----
+  // Kept free of DOM access so the timing maths can be tested on its own.
+  var MIN_INTERVAL = 1, MAX_INTERVAL = 480, DEFAULT_INTERVAL = 15, SNOOZE_MINUTES = 5;
+
+  function clampInterval(value) {
+    var n = parseInt(value, 10);
+    if (!isFinite(n)) return DEFAULT_INTERVAL;
+    return Math.max(MIN_INTERVAL, Math.min(MAX_INTERVAL, n));
+  }
+
+  // Remaining milliseconds, never negative.
+  function remainingMs(targetTs, now) {
+    return Math.max(0, targetTs - now);
+  }
+
+  function formatClock(ms) {
+    var total = Math.ceil(ms / 1000);
+    var hours = Math.floor(total / 3600);
+    var mins = Math.floor((total % 3600) / 60);
+    var secs = total % 60;
+    var pad = function (n) { return n < 10 ? "0" + n : String(n); };
+    return hours > 0
+      ? hours + ":" + pad(mins) + ":" + pad(secs)
+      : pad(mins) + ":" + pad(secs);
+  }
+
+  if (typeof module !== "undefined" && module.exports) {
+    module.exports = { clampInterval: clampInterval, remainingMs: remainingMs,
+                       formatClock: formatClock, SNOOZE_MINUTES: SNOOZE_MINUTES,
+                       DEFAULT_INTERVAL: DEFAULT_INTERVAL };
+  }
+  // ---- PURE LOGIC END ----
+
+  (function () {
+    var STORE = "savenow.settings";
+    var $ = function (id) { return document.getElementById(id); };
+
+    var els = {
+      clock: $("clock"), state: $("state"), stateText: $("stateText"),
+      pause: $("pause"), reset: $("reset"), test: $("test"),
+      interval: $("interval"), presets: $("presets"),
+      sound: $("sound"), notify: $("notify"), note: $("note"),
+      overlay: $("overlay"), dismiss: $("dismiss"), snooze: $("snooze"),
+      elapsed: $("elapsed")
+    };
+
+    var state = {
+      minutes: DEFAULT_INTERVAL,
+      running: true,
+      targetTs: 0,
+      pausedMs: 0,
+      popupOpen: false,
+      firedAt: 0
+    };
+
+    // --- persistence ---------------------------------------------------
+    function load() {
+      try {
+        var raw = localStorage.getItem(STORE);
+        if (!raw) return;
+        var saved = JSON.parse(raw);
+        state.minutes = clampInterval(saved.minutes);
+        els.sound.checked = saved.sound !== false;
+        els.notify.checked = saved.notify === true;
+      } catch (err) {
+        /* corrupt or unavailable storage just means defaults */
+      }
+    }
+
+    function save() {
+      try {
+        localStorage.setItem(STORE, JSON.stringify({
+          minutes: state.minutes,
+          sound: els.sound.checked,
+          notify: els.notify.checked
+        }));
+      } catch (err) { /* private mode - not worth interrupting anyone over */ }
+    }
+
+    // --- timer ---------------------------------------------------------
+    function restart(minutes) {
+      var ms = (minutes === undefined ? state.minutes : minutes) * 60000;
+      state.targetTs = Date.now() + ms;
+      state.pausedMs = ms;
+    }
+
+    function currentRemaining() {
+      if (state.popupOpen) return 0;
+      if (!state.running) return state.pausedMs;
+      return remainingMs(state.targetTs, Date.now());
+    }
+
+    function render() {
+      var ms = state.popupOpen ? state.minutes * 60000 : currentRemaining();
+      var text = formatClock(ms);
+      els.clock.textContent = text;
+      els.clock.classList.toggle("is-paused", !state.running);
+      els.clock.classList.toggle(
+        "is-urgent", state.running && !state.popupOpen && ms <= 60000);
+      els.state.classList.toggle("is-paused", !state.running);
+      els.stateText.textContent = state.running ? "until the next reminder" : "paused";
+      document.title = (state.running ? text + " - " : "") + "Save Now!";
+    }
+
+    // Compare against a timestamp rather than counting ticks: background tabs
+    // get throttled, and the machine may sleep. Either way this stays correct.
+    function tick() {
+      if (state.running && !state.popupOpen && remainingMs(state.targetTs, Date.now()) === 0) {
+        fire();
+      }
+      render();
+    }
+
+    function fire() {
+      state.popupOpen = true;
+      state.firedAt = Date.now();
+      els.overlay.classList.add("is-open");
+      els.elapsed.textContent = "";
+      els.dismiss.focus();
+      if (els.sound.checked) beep();
+      if (els.notify.checked) notifyDesktop();
+      render();
+    }
+
+    function closePopup(minutes) {
+      state.popupOpen = false;
+      els.overlay.classList.remove("is-open");
+      restart(minutes);
+      if (!state.running) { state.running = true; els.pause.textContent = "Pause"; }
+      render();
+    }
+
+    // --- sound ---------------------------------------------------------
+    var audioCtx = null;
+    function beep() {
+      try {
+        var Ctor = window.AudioContext || window.webkitAudioContext;
+        if (!Ctor) return;
+        audioCtx = audioCtx || new Ctor();
+        if (audioCtx.state === "suspended") audioCtx.resume();
+        var now = audioCtx.currentTime;
+        [880, 1174].forEach(function (freq, i) {
+          var osc = audioCtx.createOscillator();
+          var gain = audioCtx.createGain();
+          osc.type = "sine";
+          osc.frequency.value = freq;
+          gain.gain.setValueAtTime(0.0001, now + i * 0.16);
+          gain.gain.exponentialRampToValueAtTime(0.22, now + i * 0.16 + 0.02);
+          gain.gain.exponentialRampToValueAtTime(0.0001, now + i * 0.16 + 0.28);
+          osc.connect(gain).connect(audioCtx.destination);
+          osc.start(now + i * 0.16);
+          osc.stop(now + i * 0.16 + 0.3);
+        });
+      } catch (err) { /* audio is a nicety, never a blocker */ }
+    }
+
+    // --- desktop notification ------------------------------------------
+    function notifyDesktop() {
+      try {
+        if (!("Notification" in window) || Notification.permission !== "granted") return;
+        var n = new Notification("Save Now!", {
+          body: "Take a second and save your work.",
+          tag: "savenow"
+        });
+        n.onclick = function () { window.focus(); n.close(); };
+      } catch (err) { /* some browsers block this outside a gesture */ }
+    }
+
+    function requestNotifications() {
+      if (!("Notification" in window)) {
+        els.note.textContent = "This browser doesn't support desktop notifications, "
+          + "but the on-screen reminder still works.";
+        els.notify.checked = false;
+        return;
+      }
+      if (Notification.permission === "granted") return;
+      if (Notification.permission === "denied") {
+        els.note.textContent = "Notifications are blocked for this page in your "
+          + "browser settings. The on-screen reminder still works.";
+        els.notify.checked = false;
+        return;
+      }
+      Notification.requestPermission().then(function (result) {
+        if (result !== "granted") {
+          els.notify.checked = false;
+          els.note.textContent = "Without permission the reminder only appears on "
+            + "this tab. You can allow notifications from the icon in the address bar.";
+        }
+        save();
+      });
+    }
+
+    // --- interval ------------------------------------------------------
+    function applyInterval(value) {
+      var minutes = clampInterval(value);
+      var changed = minutes !== state.minutes;
+      state.minutes = minutes;
+      els.interval.value = String(minutes);
+      markPresets();
+      if (changed) { restart(); save(); }
+      render();
+    }
+
+    var PRESETS = [5, 10, 15, 30, 60];
+    function buildPresets() {
+      PRESETS.forEach(function (m) {
+        var b = document.createElement("button");
+        b.type = "button";
+        b.textContent = m + "m";
+        b.dataset.minutes = String(m);
+        b.addEventListener("click", function () { applyInterval(m); });
+        els.presets.appendChild(b);
+      });
+    }
+    function markPresets() {
+      Array.prototype.forEach.call(els.presets.children, function (b) {
+        b.setAttribute("aria-pressed",
+          Number(b.dataset.minutes) === state.minutes ? "true" : "false");
+      });
+    }
+
+    // --- wiring --------------------------------------------------------
+    els.pause.addEventListener("click", function () {
+      if (state.running) {
+        state.pausedMs = remainingMs(state.targetTs, Date.now());
+        state.running = false;
+        els.pause.textContent = "Resume";
+      } else {
+        state.targetTs = Date.now() + state.pausedMs;
+        state.running = true;
+        els.pause.textContent = "Pause";
+      }
+      render();
+    });
+
+    els.reset.addEventListener("click", function () { restart(); render(); });
+    els.test.addEventListener("click", function () { if (!state.popupOpen) fire(); });
+    els.dismiss.addEventListener("click", function () { closePopup(); });
+    els.snooze.addEventListener("click", function () { closePopup(SNOOZE_MINUTES); });
+
+    els.interval.addEventListener("change", function () { applyInterval(els.interval.value); });
+    els.interval.addEventListener("blur", function () { applyInterval(els.interval.value); });
+
+    els.sound.addEventListener("change", function () {
+      save();
+      if (els.sound.checked) beep();   // confirm it is audible
+    });
+    els.notify.addEventListener("change", function () {
+      if (els.notify.checked) requestNotifications();
+      save();
+    });
+
+    document.addEventListener("keydown", function (e) {
+      if (!state.popupOpen) return;
+      if (e.key === "Escape" || e.key === "Enter") { e.preventDefault(); closePopup(); }
+    });
+
+    // Show how long the reminder went unanswered, once it has been a while.
+    setInterval(function () {
+      if (!state.popupOpen) return;
+      var waiting = Date.now() - state.firedAt;
+      els.elapsed.textContent = waiting > 20000
+        ? "waiting " + formatClock(waiting) : "";
+    }, 1000);
+
+    // --- go ------------------------------------------------------------
+    load();
+    buildPresets();
+    els.interval.value = String(state.minutes);
+    markPresets();
+    restart();
+    render();
+    setInterval(tick, 250);
+  })();
+</script>
