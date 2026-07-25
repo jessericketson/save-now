@@ -11,6 +11,7 @@
     --accent: #2f6fe4;
     --accent-soft: rgba(47, 111, 228, 0.10);
     --urgent: #b9761a;
+    --good: #1f7a4d;
     --shadow: 0 1px 2px rgba(24, 32, 46, .06), 0 12px 32px rgba(24, 32, 46, .10);
 
     --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
@@ -30,6 +31,7 @@
       --accent: #5b93f5;
       --accent-soft: rgba(91, 147, 245, 0.14);
       --urgent: #f0a63c;
+      --good: #4ec48a;
       --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 16px 40px rgba(0, 0, 0, .45);
     }
   }
@@ -45,6 +47,7 @@
     --accent: #5b93f5;
     --accent-soft: rgba(91, 147, 245, 0.14);
     --urgent: #f0a63c;
+    --good: #4ec48a;
     --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 16px 40px rgba(0, 0, 0, .45);
   }
 
@@ -58,6 +61,7 @@
     --accent: #2f6fe4;
     --accent-soft: rgba(47, 111, 228, 0.10);
     --urgent: #b9761a;
+    --good: #1f7a4d;
     --shadow: 0 1px 2px rgba(24, 32, 46, .06), 0 12px 32px rgba(24, 32, 46, .10);
   }
 
@@ -121,10 +125,7 @@
     align-items: center;
     gap: 7px;
   }
-  .dot {
-    width: 6px; height: 6px; border-radius: 50%;
-    background: var(--accent);
-  }
+  .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
   .state.is-paused .dot { background: var(--muted); }
 
   /* --- controls -------------------------------------------------------- */
@@ -183,12 +184,32 @@
   }
 
   /* --- options --------------------------------------------------------- */
-  .options { display: flex; flex-direction: column; gap: 9px; border-top: 1px solid var(--line); padding-top: 18px; }
-  .opt { display: flex; align-items: center; gap: 9px; font-size: 0.82rem; color: var(--muted); cursor: pointer; }
-  .opt input { accent-color: var(--accent); width: 15px; height: 15px; cursor: pointer; }
+  .options {
+    display: flex; flex-direction: column; gap: 10px;
+    border-top: 1px solid var(--line); padding-top: 18px;
+  }
+  .opt { display: flex; align-items: flex-start; gap: 9px; font-size: 0.82rem; color: var(--muted); cursor: pointer; }
+  .opt input { accent-color: var(--accent); width: 15px; height: 15px; margin-top: 1px; cursor: pointer; flex: none; }
   .opt input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .opt b { color: var(--text); font-weight: 550; }
 
-  .note { font-size: 0.74rem; color: var(--muted); line-height: 1.5; margin: 0; }
+  .perm {
+    display: none;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.76rem;
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    padding: 10px 12px;
+  }
+  .perm.is-shown { display: flex; }
+  .perm span { flex: 1; color: var(--muted); }
+  .perm span.is-good { color: var(--good); }
+  .perm span.is-bad { color: var(--urgent); }
+  .perm button { flex: none; font-size: 0.76rem; padding: 6px 10px; }
+
+  .note { font-size: 0.74rem; color: var(--muted); line-height: 1.55; margin: 0; }
 
   /* --- reminder overlay ------------------------------------------------ */
   .overlay {
@@ -265,11 +286,25 @@
   </fieldset>
 
   <div class="options">
-    <label class="opt"><input type="checkbox" id="sound" checked> Play a sound</label>
-    <label class="opt"><input type="checkbox" id="notify"> Also show a desktop notification</label>
+    <label class="opt">
+      <input type="checkbox" id="sound" checked>
+      <span><b>Play a sound</b> — audible even when this tab is in the background.</span>
+    </label>
+
+    <label class="opt">
+      <input type="checkbox" id="notify">
+      <span><b>Show a desktop notification</b> — the only kind of alert a web
+      page can put in front of other apps.</span>
+    </label>
+
+    <div class="perm" id="perm">
+      <span id="permText"></span>
+      <button type="button" id="permAction">Allow</button>
+    </div>
+
     <p class="note" id="note">
-      Keep this tab open. Desktop notifications let the reminder reach you while
-      you're working in another window.
+      A browser cannot force a window to the front, so leave this tab open and
+      turn on notifications to be interrupted while you work elsewhere.
     </p>
   </div>
 </main>
@@ -313,10 +348,32 @@
       : pad(mins) + ":" + pad(secs);
   }
 
+  // What to tell the user about notifications, given the browser's state.
+  function permissionMessage(supported, permission, embedded) {
+    if (!supported) {
+      return { show: true, tone: "bad", action: null,
+               text: "This browser can't show desktop notifications." };
+    }
+    if (embedded) {
+      return { show: true, tone: "bad", action: null,
+               text: "Notifications are blocked inside an embedded preview. Open the page in its own tab." };
+    }
+    if (permission === "granted") {
+      return { show: true, tone: "good", action: "test",
+               text: "Notifications are on." };
+    }
+    if (permission === "denied") {
+      return { show: true, tone: "bad", action: null,
+               text: "Notifications are blocked for this site. Allow them from the icon in the address bar." };
+    }
+    return { show: true, tone: "", action: "allow",
+             text: "Your browser needs permission first." };
+  }
+
   if (typeof module !== "undefined" && module.exports) {
     module.exports = { clampInterval: clampInterval, remainingMs: remainingMs,
-                       formatClock: formatClock, SNOOZE_MINUTES: SNOOZE_MINUTES,
-                       DEFAULT_INTERVAL: DEFAULT_INTERVAL };
+                       formatClock: formatClock, permissionMessage: permissionMessage,
+                       SNOOZE_MINUTES: SNOOZE_MINUTES, DEFAULT_INTERVAL: DEFAULT_INTERVAL };
   }
   // ---- PURE LOGIC END ----
 
@@ -324,11 +381,22 @@
     var STORE = "savenow.settings";
     var $ = function (id) { return document.getElementById(id); };
 
+    // A data URI so the notification carries the icon in both the hosted page
+    // and a standalone file, with nothing to fetch.
+    var ICON = "data:image/svg+xml,"
+      + "%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E"
+      + "%3Crect width='100' height='100' rx='22' fill='%235b93f5'/%3E"
+      + "%3Cpath d='M26 26h48v48H26z' fill='none' stroke='%23fff' stroke-width='6'/%3E"
+      + "%3Cpath d='M36 30h30v14H36z' fill='%23fff'/%3E"
+      + "%3Cpath d='M56 30h6v14h-6z' fill='%235b93f5'/%3E"
+      + "%3Cpath d='M34 52h32v18H34z' fill='%23fff'/%3E%3C/svg%3E";
+
     var els = {
       clock: $("clock"), state: $("state"), stateText: $("stateText"),
       pause: $("pause"), reset: $("reset"), test: $("test"),
       interval: $("interval"), presets: $("presets"),
       sound: $("sound"), notify: $("notify"), note: $("note"),
+      perm: $("perm"), permText: $("permText"), permAction: $("permAction"),
       overlay: $("overlay"), dismiss: $("dismiss"), snooze: $("snooze"),
       elapsed: $("elapsed")
     };
@@ -342,6 +410,9 @@
       firedAt: 0
     };
 
+    var supportsNotify = "Notification" in window;
+    var embedded = window.self !== window.top;   // artifact/preview iframes
+
     // --- persistence ---------------------------------------------------
     function load() {
       try {
@@ -351,9 +422,7 @@
         state.minutes = clampInterval(saved.minutes);
         els.sound.checked = saved.sound !== false;
         els.notify.checked = saved.notify === true;
-      } catch (err) {
-        /* corrupt or unavailable storage just means defaults */
-      }
+      } catch (err) { /* corrupt or unavailable storage just means defaults */ }
     }
 
     function save() {
@@ -364,6 +433,120 @@
           notify: els.notify.checked
         }));
       } catch (err) { /* private mode - not worth interrupting anyone over */ }
+    }
+
+    // --- sound ---------------------------------------------------------
+    // The context must be created and resumed during a real user gesture.
+    // Doing it lazily inside the alarm meant the browser kept it suspended
+    // and the timed reminder was silent.
+    var audioCtx = null;
+
+    function unlockAudio() {
+      try {
+        var Ctor = window.AudioContext || window.webkitAudioContext;
+        if (!Ctor) return;
+        if (!audioCtx) audioCtx = new Ctor();
+        if (audioCtx.state === "suspended") audioCtx.resume();
+      } catch (err) { /* audio is a nicety, never a blocker */ }
+    }
+
+    function chime(times) {
+      if (!audioCtx) unlockAudio();
+      if (!audioCtx) return;
+      if (audioCtx.state === "suspended") audioCtx.resume();
+      try {
+        var start = audioCtx.currentTime + 0.02;
+        var notes = [880, 1174.7, 1567.9];
+        for (var pass = 0; pass < (times || 1); pass++) {
+          for (var i = 0; i < notes.length; i++) {
+            var at = start + pass * 0.85 + i * 0.17;
+            var osc = audioCtx.createOscillator();
+            var gain = audioCtx.createGain();
+            osc.type = "triangle";
+            osc.frequency.value = notes[i];
+            gain.gain.setValueAtTime(0.0001, at);
+            gain.gain.exponentialRampToValueAtTime(0.35, at + 0.015);
+            gain.gain.exponentialRampToValueAtTime(0.0001, at + 0.32);
+            osc.connect(gain).connect(audioCtx.destination);
+            osc.start(at);
+            osc.stop(at + 0.34);
+          }
+        }
+      } catch (err) { /* ignore */ }
+    }
+
+    // Any interaction counts as the gesture that unlocks audio.
+    ["pointerdown", "keydown", "touchstart"].forEach(function (ev) {
+      document.addEventListener(ev, unlockAudio, { passive: true });
+    });
+    document.addEventListener("visibilitychange", function () {
+      if (!document.hidden) unlockAudio();
+    });
+
+    // --- notifications --------------------------------------------------
+    function refreshPermissionRow() {
+      var info = permissionMessage(supportsNotify,
+        supportsNotify ? Notification.permission : "unsupported", embedded);
+      els.perm.classList.toggle("is-shown", els.notify.checked && info.show);
+      els.permText.textContent = info.text;
+      els.permText.className = info.tone === "good" ? "is-good"
+                             : info.tone === "bad" ? "is-bad" : "";
+      if (info.action) {
+        els.permAction.hidden = false;
+        els.permAction.textContent = info.action === "test" ? "Send a test" : "Allow";
+        els.permAction.dataset.action = info.action;
+      } else {
+        els.permAction.hidden = true;
+      }
+    }
+
+    function notifyDesktop(isTest) {
+      if (!supportsNotify || Notification.permission !== "granted") return false;
+      try {
+        var n = new Notification(isTest ? "Save Now! — test" : "Save Now!", {
+          body: "Take a second and save your work.",
+          tag: "savenow",
+          renotify: true,
+          requireInteraction: true,   // stays on screen until dismissed
+          icon: ICON
+        });
+        n.onclick = function () {
+          window.focus();
+          if (window.parent) { try { window.parent.focus(); } catch (e) {} }
+          n.close();
+        };
+        return true;
+      } catch (err) {
+        return false;   // some browsers require a service worker registration
+      }
+    }
+
+    function askPermission() {
+      if (!supportsNotify || embedded) { refreshPermissionRow(); return; }
+      Notification.requestPermission().then(function (result) {
+        refreshPermissionRow();
+        if (result === "granted") notifyDesktop(true);
+        else els.notify.checked = result === "granted";
+        save();
+      }).catch(function () { refreshPermissionRow(); });
+    }
+
+    els.permAction.addEventListener("click", function () {
+      if (els.permAction.dataset.action === "test") notifyDesktop(true);
+      else askPermission();
+    });
+
+    // --- title attention ------------------------------------------------
+    var flashTimer = null;
+    function startFlashing() {
+      stopFlashing();
+      var on = false;
+      flashTimer = setInterval(function () {
+        document.title = (on = !on) ? "*** SAVE NOW ***" : "Save Now!";
+      }, 900);
+    }
+    function stopFlashing() {
+      if (flashTimer) { clearInterval(flashTimer); flashTimer = null; }
     }
 
     // --- timer ---------------------------------------------------------
@@ -388,7 +571,7 @@
         "is-urgent", state.running && !state.popupOpen && ms <= 60000);
       els.state.classList.toggle("is-paused", !state.running);
       els.stateText.textContent = state.running ? "until the next reminder" : "paused";
-      document.title = (state.running ? text + " - " : "") + "Save Now!";
+      if (!state.popupOpen) document.title = (state.running ? text + " - " : "") + "Save Now!";
     }
 
     // Compare against a timestamp rather than counting ticks: background tabs
@@ -406,77 +589,19 @@
       els.overlay.classList.add("is-open");
       els.elapsed.textContent = "";
       els.dismiss.focus();
-      if (els.sound.checked) beep();
-      if (els.notify.checked) notifyDesktop();
+      if (els.sound.checked) chime(2);
+      if (els.notify.checked) notifyDesktop(false);
+      startFlashing();
       render();
     }
 
     function closePopup(minutes) {
       state.popupOpen = false;
       els.overlay.classList.remove("is-open");
+      stopFlashing();
       restart(minutes);
       if (!state.running) { state.running = true; els.pause.textContent = "Pause"; }
       render();
-    }
-
-    // --- sound ---------------------------------------------------------
-    var audioCtx = null;
-    function beep() {
-      try {
-        var Ctor = window.AudioContext || window.webkitAudioContext;
-        if (!Ctor) return;
-        audioCtx = audioCtx || new Ctor();
-        if (audioCtx.state === "suspended") audioCtx.resume();
-        var now = audioCtx.currentTime;
-        [880, 1174].forEach(function (freq, i) {
-          var osc = audioCtx.createOscillator();
-          var gain = audioCtx.createGain();
-          osc.type = "sine";
-          osc.frequency.value = freq;
-          gain.gain.setValueAtTime(0.0001, now + i * 0.16);
-          gain.gain.exponentialRampToValueAtTime(0.22, now + i * 0.16 + 0.02);
-          gain.gain.exponentialRampToValueAtTime(0.0001, now + i * 0.16 + 0.28);
-          osc.connect(gain).connect(audioCtx.destination);
-          osc.start(now + i * 0.16);
-          osc.stop(now + i * 0.16 + 0.3);
-        });
-      } catch (err) { /* audio is a nicety, never a blocker */ }
-    }
-
-    // --- desktop notification ------------------------------------------
-    function notifyDesktop() {
-      try {
-        if (!("Notification" in window) || Notification.permission !== "granted") return;
-        var n = new Notification("Save Now!", {
-          body: "Take a second and save your work.",
-          tag: "savenow"
-        });
-        n.onclick = function () { window.focus(); n.close(); };
-      } catch (err) { /* some browsers block this outside a gesture */ }
-    }
-
-    function requestNotifications() {
-      if (!("Notification" in window)) {
-        els.note.textContent = "This browser doesn't support desktop notifications, "
-          + "but the on-screen reminder still works.";
-        els.notify.checked = false;
-        return;
-      }
-      if (Notification.permission === "granted") return;
-      if (Notification.permission === "denied") {
-        els.note.textContent = "Notifications are blocked for this page in your "
-          + "browser settings. The on-screen reminder still works.";
-        els.notify.checked = false;
-        return;
-      }
-      Notification.requestPermission().then(function (result) {
-        if (result !== "granted") {
-          els.notify.checked = false;
-          els.note.textContent = "Without permission the reminder only appears on "
-            + "this tab. You can allow notifications from the icon in the address bar.";
-        }
-        save();
-      });
     }
 
     // --- interval ------------------------------------------------------
@@ -532,10 +657,18 @@
 
     els.sound.addEventListener("change", function () {
       save();
-      if (els.sound.checked) beep();   // confirm it is audible
+      if (els.sound.checked) { unlockAudio(); chime(1); }   // prove it is audible
     });
+
     els.notify.addEventListener("change", function () {
-      if (els.notify.checked) requestNotifications();
+      refreshPermissionRow();
+      if (els.notify.checked && supportsNotify && !embedded
+          && Notification.permission === "default") {
+        askPermission();
+      } else if (els.notify.checked && supportsNotify && !embedded
+                 && Notification.permission === "granted") {
+        notifyDesktop(true);
+      }
       save();
     });
 
@@ -557,6 +690,11 @@
     buildPresets();
     els.interval.value = String(state.minutes);
     markPresets();
+    refreshPermissionRow();
+    if (embedded) {
+      els.note.textContent = "This is an embedded preview, so notifications and "
+        + "sound are restricted. Open the page in its own tab for the full thing.";
+    }
     restart();
     render();
     setInterval(tick, 250);
